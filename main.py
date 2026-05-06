@@ -21,21 +21,18 @@ async def generate(
         raise HTTPException(status_code=500, detail="API key not configured")
 
     async with httpx.AsyncClient(timeout=120) as client:
-        form_data = {
-            "visibility": "private",
-            "voice_name": "ex_voice",
-            "title": "ex_voice",
-            "train_mode": "fast"
-        }
         files_data = []
         for f in files:
             content = await f.read()
-            files_data.append(("voices", (f.filename, content, f.content_type)))
+            files_data.append(("voices", (f.filename, content, "audio/mpeg")))
+
+        files_data.append(("visibility", (None, "private")))
+        files_data.append(("title", (None, "ex_voice")))
+        files_data.append(("train_mode", (None, "fast")))
 
         clone_response = await client.post(
             "https://api.fish.audio/model",
             headers={"Authorization": f"Bearer {FISH_API_KEY}"},
-            data=form_data,
             files=files_data
         )
         if clone_response.status_code != 200:
