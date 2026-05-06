@@ -22,21 +22,23 @@ async def generate(
 
     headers = {"Authorization": f"Bearer {FISH_API_KEY}"}
 
-    files_data = []
+    file_contents = []
     for f in files:
         content = await f.read()
-        files_data.append(("voices", (f.filename, content, "audio/mpeg")))
+        file_contents.append((f.filename, content))
 
     async with httpx.AsyncClient(timeout=120) as client:
+        multipart = httpx.multipart.MultipartData()
+        multipart.add_field("visibility", "private")
+        multipart.add_field("title", "ex_voice")
+        multipart.add_field("train_mode", "fast")
+        for filename, content in file_contents:
+            multipart.add_file("voices", content, filename=filename, content_type="audio/mpeg")
+
         clone_response = await client.post(
             "https://api.fish.audio/model",
             headers=headers,
-            data={
-                "visibility": "private",
-                "title": "ex_voice",
-                "train_mode": "fast"
-            },
-            files=files_data
+            content=multipart.render()
         )
 
         if clone_response.status_code != 200:
