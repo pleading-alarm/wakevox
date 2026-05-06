@@ -21,7 +21,12 @@ async def generate(
         raise HTTPException(status_code=500, detail="API key not configured")
 
     async with httpx.AsyncClient(timeout=120) as client:
-        form_data = {"visibility": "private", "voice_name": "ex_voice"}
+        form_data = {
+            "visibility": "private",
+            "voice_name": "ex_voice",
+            "title": "ex_voice",
+            "train_mode": "fast"
+        }
         files_data = []
         for f in files:
             content = await f.read()
@@ -33,7 +38,6 @@ async def generate(
             data=form_data,
             files=files_data
         )
-
         if clone_response.status_code != 200:
             raise HTTPException(status_code=400, detail=f"Clone error: {clone_response.text}")
 
