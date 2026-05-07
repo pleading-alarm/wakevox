@@ -27,10 +27,8 @@ async def generate(
             content = await f.read()
             references.append(ReferenceAudio(audio=content, text=""))
 
-        client = AsyncFishAudio(api_key=FISH_API_KEY)
-        
-        audio_chunks = []
-        async with client:
+        async with AsyncFishAudio(api_key=FISH_API_KEY) as client:
+            audio_chunks = []
             async for chunk in client.tts.stream(
                 text=prompt,
                 references=references,
