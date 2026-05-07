@@ -3,6 +3,7 @@ from fastapi.responses import StreamingResponse
 import httpx
 import io
 import os
+import tempfile
 
 app = FastAPI()
 
@@ -22,41 +23,63 @@ async def generate(
 
     headers = {"Authorization": f"Bearer {FISH_API_KEY}"}
 
-    file_contents = []
-    for f in files:
-        content = await f.read()
-        file_contents.append((f.filename, content))
+    # Сохраняем файлы во временную папку
+    temp_files = []
+    try:
+        for f in files:
+            content = await f.read()
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".m4a")
+            tmp.write(content)
+            tmp.close()
+            temp_files.append((f.filename, tmp.name))
 
-    async with httpx.AsyncClient(timeout=120) as client:
-        clone_response = await client.post(
-            "https://api.fish.audio/model",
-            headers=headers,
-            data={
-                "visibility": "private",
-                "title": "ex_voice",
-                "train_mode": "fast"
-            },
-            files=[("voices", (name, content, "audio/mpeg")) for name, content in file_contents]
-        )
+        async with httpx.AsyncClient(timeout=120) as client:
+            # Открываем файлы и отправляем
+            open_files = []
+            file_handles = []
+            for filename, path in temp_files:
+                fh = open(path, "rb")
+                file_handles.append(fh)
+                open_files.append(("voices", (filename, fh, "audio/mpeg")))
 
-        if clone_response.status_code != 200:
-            raise HTTPException(status_code=400, detail=f"Clone error: {clone_response.text}")
+            clone_response = await client.post(
+                "https://api.fish.audio/model",
+                headers=headers,
+                data={
+                    "visibility": "private",
+                    "title": "ex_voice",
+                    "train_mode": "fast"
+                },
+                files=open_files
+            )
 
-        voice_id = clone_response.json()["_id"]
+            for fh in file_handles:
+                fh.close()
 
-        tts_response = await client.post(
-            "https://api.fish.audio/v1/tts",
-            headers={**headers, "Content-Type": "application/json"},
-            json={"text": prompt, "reference_id": voice_id, "format": "mp3"}
-        )
+            if clone_response.status_code != 200:
+                raise HTTPException(status_code=400, detail=f"Clone error: {clone_response.text}")
 
-        await client.delete(f"https://api.fish.audio/model/{voice_id}", headers=headers)
+            voice_id = clone_response.json()["_id"]
 
-        if tts_response.status_code != 200:
-            raise HTTPException(status_code=400, detail=f"TTS error: {tts_response.text}")
+            tts_response = await client.post(
+                "https://api.fish.audio/v1/tts",
+                headers={**headers, "Content-Type": "application/json"},
+                json={"text": prompt, "reference_id": voice_id, "format": "mp3"}
+            )
 
-        return StreamingResponse(
-            io.BytesIO(tts_response.content),
-            media_type="audio/mpeg",
-            headers={"Content-Disposition": "attachment; filename=generated.mp3"}
-        )
+            await client.delete(f"https://api.fish.audio/model/{voice_id}", headers=headers)
+
+            if tts_response.status_code != 200:
+                raise HTTPException(status_code=400, detail=f"TTS error: {tts_response.text}")
+
+            return StreamingResponse(
+                io.BytesIO(tts_response.content),
+                media_type="audio/mpeg",
+                headers={"Content-Disposition": "attachment; filename=generated.mp3"}
+            )
+    finally:
+        for _, path in temp_files:
+            try:
+                os.unlink(path)
+            except:
+                pass
