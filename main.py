@@ -28,17 +28,15 @@ async def generate(
         file_contents.append((f.filename, content))
 
     async with httpx.AsyncClient(timeout=120) as client:
-        multipart = httpx.multipart.MultipartData()
-        multipart.add_field("visibility", "private")
-        multipart.add_field("title", "ex_voice")
-        multipart.add_field("train_mode", "fast")
-        for filename, content in file_contents:
-            multipart.add_file("voices", content, filename=filename, content_type="audio/mpeg")
-
         clone_response = await client.post(
             "https://api.fish.audio/model",
             headers=headers,
-            content=multipart.render()
+            data={
+                "visibility": "private",
+                "title": "ex_voice",
+                "train_mode": "fast"
+            },
+            files=[("voices", (name, content, "audio/mpeg")) for name, content in file_contents]
         )
 
         if clone_response.status_code != 200:
@@ -49,17 +47,10 @@ async def generate(
         tts_response = await client.post(
             "https://api.fish.audio/v1/tts",
             headers={**headers, "Content-Type": "application/json"},
-            json={
-                "text": prompt,
-                "reference_id": voice_id,
-                "format": "mp3"
-            }
+            json={"text": prompt, "reference_id": voice_id, "format": "mp3"}
         )
 
-        await client.delete(
-            f"https://api.fish.audio/model/{voice_id}",
-            headers=headers
-        )
+        await client.delete(f"https://api.fish.audio/model/{voice_id}", headers=headers)
 
         if tts_response.status_code != 200:
             raise HTTPException(status_code=400, detail=f"TTS error: {tts_response.text}")
