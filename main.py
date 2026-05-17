@@ -4,43 +4,39 @@ import io
 import os
 from fishaudio import AsyncFishAudio
 from fishaudio.types import ReferenceAudio
- 
+
 app = FastAPI()
- 
+
 FISH_API_KEY = os.environ.get("FISH_API_KEY", "")
- 
+
+EMOTIONAL_TEXT = "(sobbing) Пожалуйста... вернись ко мне... (crying loudly) я не могу без тебя... (sighing) я так скучаю по тебе... прости меня..."
+
 @app.get("/")
 def root():
     return {"status": "ok"}
- 
+
 @app.post("/generate")
 async def generate(
     prompt: str = Form(...),
     files: list[UploadFile] = File(...),
-    transcripts: list[str] = Form(None),
 ):
     if not FISH_API_KEY:
         raise HTTPException(status_code=500, detail="API key not configured")
- 
+
     try:
         references = []
-        for i, f in enumerate(files):
+        for f in files:
             content = await f.read()
-            # Используем транскрипцию если передана, иначе пустая строка
-            text = transcripts[i] if transcripts and i < len(transcripts) else ""
-            references.append(ReferenceAudio(audio=content, text=text))
- 
+            references.append(ReferenceAudio(audio=content, text=""))
+
         async with AsyncFishAudio(api_key=FISH_API_KEY) as client:
             stream = await client.tts.stream(
-                text=prompt,
+                text=EMOTIONAL_TEXT,
                 references=references,
                 format="mp3",
-                # Параметры качества голоса
-                chunk_length=200,
-                normalize=True,
             )
             audio_bytes = await stream.collect()
- 
+
         return StreamingResponse(
             io.BytesIO(audio_bytes),
             media_type="audio/mpeg",
