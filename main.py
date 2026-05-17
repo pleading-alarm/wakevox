@@ -13,7 +13,7 @@ FISH_API_KEY = os.environ.get("FISH_API_KEY", "")
 VOICE_MODEL_ID = "592087783c2f4e19ac2683c3bb06735b"
  
 # Текст с эмоциональными тегами Fish Audio S2
-EMOTIONAL_TEXT = "(sobbing) Пожалуйста... вернись ко мне... (crying loudly) я не могу без тебя... (sighing) я так скучаю по тебе... прости меня..."
+EMOTIONAL_TEXT = "(sobbing) Please... come back to me... (crying loudly) I cannot live without you... (sighing) I miss you so much... forgive me..."
  
 @app.get("/")
 def root():
