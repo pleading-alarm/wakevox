@@ -1,15 +1,12 @@
-
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import StreamingResponse
 import io
 import os
-import httpx
-import json
+from fish_audio_sdk import Session, TTSRequest, ReferenceAudio
  
 app = FastAPI()
  
 FISH_API_KEY = os.environ.get("FISH_API_KEY", "")
-FISH_TTS_URL = "https://api.fish.audio/v1/tts"
  
 @app.get("/")
 def root():
@@ -28,35 +25,24 @@ async def generate(
  
     try:
         ref_audio = await files[0].read()
-        filename = files[0].filename or "audio.m4a"
  
-        # Fish Audio принимает multipart: request (JSON) + audio файл
-        request_data = {
-            "text": prompt,
-            "format": "mp3",
-            "references": [{"text": ""}]
-        }
+        session = Session(FISH_API_KEY)
  
-        async with httpx.AsyncClient(timeout=120) as client:
-            response = await client.post(
-                FISH_TTS_URL,
-                headers={"Authorization": f"Bearer {FISH_API_KEY}"},
-                files={
-                    "request": (None, json.dumps(request_data), "application/json"),
-                    "references[0].audio": (filename, ref_audio, "audio/mpeg"),
-                }
-            )
+        audio_chunks = []
+        for chunk in session.tts(TTSRequest(
+            text=prompt,
+            references=[ReferenceAudio(audio=ref_audio, text="")],
+            format="mp3",
+        )):
+            audio_chunks.append(chunk)
  
-        if response.status_code != 200:
-            raise HTTPException(status_code=500, detail=f"Fish Audio error: {response.text}")
+        audio_bytes = b"".join(audio_chunks)
  
         return StreamingResponse(
-            io.BytesIO(response.content),
+            io.BytesIO(audio_bytes),
             media_type="audio/mpeg",
             headers={"Content-Disposition": "attachment; filename=generated.mp3"}
         )
  
-    except HTTPException:
-        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
