@@ -47,22 +47,23 @@ async def generate(
         raise HTTPException(status_code=400, detail="No reference audio files provided")
  
     try:
-        ref_audio_raw = await files[0].read()
-        filename = files[0].filename or "audio.m4a"
-        ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else "m4a"
- 
-        print(f"Received: {filename}, size: {len(ref_audio_raw)} bytes, ext: {ext}")
- 
-        # Конвертируем в wav
-        ref_audio = convert_to_wav(ref_audio_raw, ext)
-        print(f"Converted to wav: {len(ref_audio)} bytes")
+        # Берём до 3 файлов
+        references = []
+        for f in files[:3]:
+            raw = await f.read()
+            filename = f.filename or "audio.m4a"
+            ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else "m4a"
+            print(f"Received: {filename}, size: {len(raw)} bytes, ext: {ext}")
+            wav = convert_to_wav(raw, ext)
+            print(f"Converted to wav: {len(wav)} bytes")
+            references.append(ReferenceAudio(audio=wav, text=""))
  
         session = Session(FISH_API_KEY)
  
         audio_chunks = []
         for chunk in session.tts(TTSRequest(
             text=prompt,
-            references=[ReferenceAudio(audio=ref_audio, text="")],
+            references=references,
             format="mp3",
         )):
             audio_chunks.append(chunk)
@@ -81,4 +82,3 @@ async def generate(
     except Exception as e:
         print(f"Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
- 
