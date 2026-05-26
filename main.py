@@ -26,6 +26,9 @@ async def generate(
     try:
         ref_audio = await files[0].read()
  
+        # Логируем размер файла для отладки
+        print(f"Received file: {files[0].filename}, size: {len(ref_audio)} bytes")
+ 
         session = Session(FISH_API_KEY)
  
         audio_chunks = []
@@ -37,6 +40,7 @@ async def generate(
             audio_chunks.append(chunk)
  
         audio_bytes = b"".join(audio_chunks)
+        print(f"Generated audio size: {len(audio_bytes)} bytes")
  
         return StreamingResponse(
             io.BytesIO(audio_bytes),
@@ -45,4 +49,6 @@ async def generate(
         )
  
     except Exception as e:
+        print(f"Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+ 
