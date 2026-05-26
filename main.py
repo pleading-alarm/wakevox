@@ -3,6 +3,7 @@ from fastapi.responses import StreamingResponse
 import io
 import os
 import httpx
+import base64
  
 app = FastAPI()
  
@@ -25,16 +26,15 @@ async def generate(
         raise HTTPException(status_code=400, detail="No reference audio files provided")
  
     try:
-        # Читаем первый файл как reference audio
         ref_audio = await files[0].read()
+        ref_audio_b64 = base64.b64encode(ref_audio).decode("utf-8")
  
-        # Вызываем Fish Audio REST API напрямую
         payload = {
             "text": prompt,
             "format": "mp3",
             "references": [
                 {
-                    "audio": list(ref_audio),
+                    "audio": ref_audio_b64,
                     "text": ""
                 }
             ]
