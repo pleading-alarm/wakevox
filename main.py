@@ -1,3 +1,4 @@
+
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import StreamingResponse
 import io
@@ -35,6 +36,12 @@ def convert_to_wav(audio_bytes: bytes, input_ext: str = "m4a") -> bytes:
         if os.path.exists(out_path):
             os.unlink(out_path)
  
+GENERATE_TEXT = (
+    "[crying] Please... [sobbing] wake up... [weeping] I beg you... "
+    "[moaning] I'm so sorry... [exhale] I was wrong... [crying] I love you so much... "
+    "[sobbing] Please... [whispering] don't leave me... [crying] wake up..."
+)
+ 
 @app.post("/generate")
 async def generate(
     prompt: str = Form(...),
@@ -47,7 +54,6 @@ async def generate(
         raise HTTPException(status_code=400, detail="No reference audio files provided")
  
     try:
-        # Берём до 3 файлов
         references = []
         for f in files[:3]:
             raw = await f.read()
@@ -60,9 +66,12 @@ async def generate(
  
         session = Session(FISH_API_KEY)
  
+        # Используем текст с эмоциями из запроса, но если он пустой — берём драматический
+        text_to_generate = prompt if prompt.strip() else GENERATE_TEXT
+ 
         audio_chunks = []
         for chunk in session.tts(TTSRequest(
-            text=prompt,
+            text=text_to_generate,
             references=references,
             format="mp3",
         )):
