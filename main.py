@@ -9,12 +9,6 @@ app = FastAPI()
  
 FISH_API_KEY = os.environ.get("FISH_API_KEY", "")
  
-# ID модели голоса созданной на Fish Audio
-VOICE_MODEL_ID = "592087783c2f4e19ac2683c3bb06735b"
- 
-# Текст с эмоциональными тегами Fish Audio S2
-EMOTIONAL_TEXT = "(sobbing) Please... come back to me... (crying loudly) I cannot live without you... (sighing) I miss you so much... forgive me..."
- 
 @app.get("/")
 def root():
     return {"status": "ok"}
@@ -27,12 +21,20 @@ async def generate(
     if not FISH_API_KEY:
         raise HTTPException(status_code=500, detail="API key not configured")
  
+    if not files:
+        raise HTTPException(status_code=400, detail="No reference audio files provided")
+ 
     try:
+        # Читаем все загруженные файлы как ReferenceAudio
+        references = []
+        for f in files:
+            audio_bytes = await f.read()
+            references.append(ReferenceAudio(audio=audio_bytes))
+ 
         async with AsyncFishAudio(api_key=FISH_API_KEY) as client:
-            # Используем reference_id модели + эмоциональные теги
             stream = await client.tts.stream(
-                text=EMOTIONAL_TEXT,
-                reference_id=VOICE_MODEL_ID,
+                text=prompt,
+                references=references,
                 format="mp3",
             )
             audio_bytes = await stream.collect()
@@ -44,3 +46,4 @@ async def generate(
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+ 
