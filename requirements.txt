@@ -1,6 +1,6 @@
 fastapi
 gunicorn
 uvicorn[standard]
-httpx
+fish-audio-sdk
 python-multipart
  
