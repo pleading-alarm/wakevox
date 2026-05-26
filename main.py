@@ -1,9 +1,10 @@
+
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import StreamingResponse
 import io
 import os
 import httpx
-import base64
+import json
  
 app = FastAPI()
  
@@ -27,26 +28,22 @@ async def generate(
  
     try:
         ref_audio = await files[0].read()
-        ref_audio_b64 = base64.b64encode(ref_audio).decode("utf-8")
+        filename = files[0].filename or "audio.m4a"
  
-        payload = {
+        # Fish Audio принимает multipart: request (JSON) + audio файл
+        request_data = {
             "text": prompt,
             "format": "mp3",
-            "references": [
-                {
-                    "audio": ref_audio_b64,
-                    "text": ""
-                }
-            ]
+            "references": [{"text": ""}]
         }
  
         async with httpx.AsyncClient(timeout=120) as client:
             response = await client.post(
                 FISH_TTS_URL,
-                json=payload,
-                headers={
-                    "Authorization": f"Bearer {FISH_API_KEY}",
-                    "Content-Type": "application/json",
+                headers={"Authorization": f"Bearer {FISH_API_KEY}"},
+                files={
+                    "request": (None, json.dumps(request_data), "application/json"),
+                    "references[0].audio": (filename, ref_audio, "audio/mpeg"),
                 }
             )
  
