@@ -68,11 +68,12 @@ async def generate(
             print(f"Converted to wav: {len(wav)} bytes")
             references.append(ReferenceAudio(audio=wav, text=""))
  
-        # Эмоциональный образец — добавляем дважды для усиления эффекта
+        # Эмоциональный образец — добавляем трижды для усиления эффекта
         emotion_wav = convert_to_wav(base64.b64decode(EMOTION_SAMPLE_B64), "opus")
         references.append(ReferenceAudio(audio=emotion_wav, text=""))
         references.append(ReferenceAudio(audio=emotion_wav, text=""))
-        print(f"Emotion sample added x2: {len(emotion_wav)} bytes")
+        references.append(ReferenceAudio(audio=emotion_wav, text=""))
+        print(f"Emotion sample added x3: {len(emotion_wav)} bytes")
  
         session = Session(FISH_API_KEY)
  
