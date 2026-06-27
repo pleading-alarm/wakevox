@@ -2,7 +2,7 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import StreamingResponse
 import io
 import os
-from fish_audio_sdk import Session, TTSRequest, ReferenceAudio, Prosody
+from fish_audio_sdk import Session, TTSRequest, ReferenceAudio
  
 app = FastAPI()
  
@@ -56,8 +56,6 @@ async def generate(
             text=text_to_generate,
             references=references,
             format="mp3",
-            prosody=Prosody(speed=1.1, volume=3.0),
-            normalize=False,
         ), backend="s2-pro"):
             audio_chunks.append(chunk)
  
@@ -73,3 +71,4 @@ async def generate(
     except Exception as e:
         print(f"Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+ 
