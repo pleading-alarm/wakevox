@@ -56,7 +56,7 @@ async def generate(
             text=text_to_generate,
             references=references,
             format="mp3",
-        ), backend="s2-pro"):
+        )):
             audio_chunks.append(chunk)
  
         audio_bytes = b"".join(audio_chunks)
