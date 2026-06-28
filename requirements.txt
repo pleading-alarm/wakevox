@@ -3,4 +3,4 @@ gunicorn
 uvicorn[standard]
 fish-audio-sdk
 python-multipart
- 
+requests
