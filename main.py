@@ -108,7 +108,7 @@ async def generate_emotional(
             raw = await f.read()
             filename = f.filename or "reference.m4a"
             print(f"Reference for cloning: {filename}, {len(raw)} bytes")
-            clone_parts.append(("files[]", (filename, raw, "audio/mpeg")))
+            clone_parts.append(("files", (filename, raw, "audio/mpeg")))
 
         temp_name = f"wakevox_temp_{uuid.uuid4().hex[:10]}"
 
