@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Request
 from fastapi.responses import StreamingResponse
 import io
 import os
@@ -6,7 +6,17 @@ import uuid
 import requests
 from fish_audio_sdk import Session, TTSRequest, ReferenceAudio
  
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+ 
+from auth import verify_app_key
+ 
 app = FastAPI()
+ 
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
  
 FISH_API_KEY = os.environ.get("FISH_API_KEY", "")
 ELEVENLABS_API_KEY = os.environ.get("ELEVENLABS_API_KEY", "")
@@ -22,8 +32,10 @@ GENERATE_TEXT = (
 def root():
     return {"status": "ok"}
  
-@app.post("/generate")
+@app.post("/generate", dependencies=[Depends(verify_app_key)])
+@limiter.limit("20/hour")
 async def generate(
+    request: Request,
     prompt: str = Form(...),
     files: list[UploadFile] = File(...),
     emotion: list[UploadFile] = File(None),
@@ -75,20 +87,22 @@ async def generate(
     except Exception as e:
         print(f"Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/generate_emotional")
+ 
+ 
+@app.post("/generate_emotional", dependencies=[Depends(verify_app_key)])
+@limiter.limit("20/hour")
 async def generate_emotional(
+    request: Request,
     files: list[UploadFile] = File(...),
     emotional_audio: UploadFile = File(...),
 ):
     """
     ElevenLabs Voice Changer.
-
+ 
     Тембр (files, макс. 2 — те же референсы, что и для Fish Audio) клонируется
     ВРЕМЕННО прямо на время этого запроса, а не хранится постоянно: иначе при
     тысячах пользователей мы упрёмся в лимит voice slots тарифа ElevenLabs.
-
+ 
     Шаги: clone (Instant Voice Cloning) -> speech-to-speech (Voice Changer,
     перенос тайминга/эмоции с emotional_audio на этот тембр) -> delete клона.
     Удаление клона выполняется в finally, чтобы слот освобождался даже если
@@ -96,10 +110,10 @@ async def generate_emotional(
     """
     if not ELEVENLABS_API_KEY:
         raise HTTPException(status_code=500, detail="ElevenLabs API key not configured")
-
+ 
     if not files:
         raise HTTPException(status_code=400, detail="No reference audio files provided")
-
+ 
     voice_id = None
     try:
         # 1) Клонируем тембр (Instant Voice Cloning) — максимум 2 файла, как у Fish Audio
@@ -109,9 +123,9 @@ async def generate_emotional(
             filename = f.filename or "reference.m4a"
             print(f"Reference for cloning: {filename}, {len(raw)} bytes")
             clone_parts.append(("files", (filename, raw, "audio/mpeg")))
-
+ 
         temp_name = f"wakevox_temp_{uuid.uuid4().hex[:10]}"
-
+ 
         clone_resp = requests.post(
             f"{ELEVENLABS_BASE}/voices/add",
             headers={"xi-api-key": ELEVENLABS_API_KEY},
@@ -122,12 +136,12 @@ async def generate_emotional(
         clone_resp.raise_for_status()
         voice_id = clone_resp.json()["voice_id"]
         print(f"Cloned temporary voice: {voice_id}")
-
+ 
         # 2) Voice Changer — переносим запись эмоционального исполнения на этот тембр
         emotional_raw = await emotional_audio.read()
         emotional_filename = emotional_audio.filename or "emotion.m4a"
         print(f"Emotional performance: {emotional_filename}, {len(emotional_raw)} bytes")
-
+ 
         sts_resp = requests.post(
             f"{ELEVENLABS_BASE}/speech-to-speech/{voice_id}",
             headers={"xi-api-key": ELEVENLABS_API_KEY},
@@ -140,13 +154,13 @@ async def generate_emotional(
         sts_resp.raise_for_status()
         audio_bytes = sts_resp.content
         print(f"Generated emotional voice: {len(audio_bytes)} bytes")
-
+ 
         return StreamingResponse(
             io.BytesIO(audio_bytes),
             media_type="audio/mpeg",
             headers={"Content-Disposition": "attachment; filename=generated_emotional.mp3"}
         )
-
+ 
     except requests.HTTPError as e:
         detail = e.response.text if e.response is not None else str(e)
         print(f"ElevenLabs error: {detail}")
